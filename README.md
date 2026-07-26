@@ -25,7 +25,6 @@ organized into monthly summaries.
 
 ```
 ├── index.html
-├── style.css
 └── script.js
 ```
 
