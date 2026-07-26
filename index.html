@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Catatan Struk — Pencatat Belanja Bulanan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          canvas: '#EEF1F6',
+          card: '#FFFFFF',
+          coral: '#FF5A45',
+          blue: '#3B82F6',
+          'blue-soft': '#E8F0FE',
+          orange: '#F59A3C',
+          'orange-soft': '#FFF1DE',
+          'gray-soft': '#F1F2F5',
+          ink: '#1F2937',
+          muted: '#6B7280',
+          line: '#E5E9F0',
+          green: '#16A34A',
+          purple: '#8B5CF6',
+          red: '#E11D48',
+          'brand-red': '#EF4444',
+          'brand-blue': '#3B82F6',
+          'brand-green': '#22C55E',
+          'brand-orange': '#F59E0B',
+        },
+        fontFamily: {
+          sans: ['Inter', 'sans-serif'],
+          mono: ['"Space Mono"', 'monospace'],
+          pixel: ['"Press Start 2P"', 'monospace'],
+        },
+        keyframes: {
+          sweep: { '0%': { top: '0%' }, '100%': { top: '100%' } },
+        },
+        animation: {
+          sweep: 'sweep 1.6s linear infinite',
+        },
+      },
+    },
+  };
+</script>
+<style>
+  /* Bagian kecil yang lebih praktis ditulis sebagai CSS biasa ketimbang utility Tailwind */
+  .manual-form{ display:grid; grid-template-columns:1fr 72px 120px; gap:8px; }
+  #manAddBtn{ grid-column:1/-1; }
+  @media (max-width:480px){
+    .manual-form{ grid-template-columns:1fr 1fr; }
+    .manual-form .m-name{ grid-column:1/-1; }
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator{ cursor:pointer; }
+  ::selection{ background:#FFF1DE; }
+</style>
+</head>
+<body class="antialiased bg-canvas text-ink font-sans min-h-screen overflow-x-hidden py-[18px] pb-[60px] sm:py-8 sm:pb-[70px]">
+<div class="app max-w-[460px] mx-auto px-3.5 w-full sm:max-w-[600px] sm:px-5 lg:max-w-[680px]">
+
+  <!-- TOP BAR -->
+  <div class="flex items-center justify-between py-2.5 px-1 pb-4">
+    <div class="flex items-center gap-2.5">
+      <span class="w-[34px] h-[34px] rounded-[10px] bg-blue flex items-center justify-center shadow-[0_4px_10px_-4px_rgba(59,130,246,.6)]">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v5a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V4z"/><path d="M8 13v3a4 4 0 0 0 8 0v-3"/></svg>
+      </span>
+      <span class="text-base font-semibold text-coral">Catatan<b class="font-extrabold">Struk</b></span>
+    </div>
+    <div class="font-mono text-[11px] bg-gray-soft text-muted px-2.5 py-1.5 rounded-full" id="dateChip">—</div>
+  </div>
+
+  <!-- SEARCH + ADD -->
+  <div class="flex gap-2.5 items-center my-4">
+    <div class="flex-1 flex items-center gap-2 bg-card border border-line rounded-full px-4 py-[11px]">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#9AA3B2" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input type="text" id="searchInput" placeholder="Cari nama barang..." class="border-0 outline-none flex-1 text-[13px] text-ink bg-transparent placeholder:text-[#B0B7C3]">
+    </div>
+    <button class="fab w-11 h-11 rounded-full bg-blue text-white border-0 text-xl leading-none cursor-pointer shadow-[0_6px_14px_-6px_rgba(59,130,246,.7)] flex-shrink-0 transition-transform duration-150 hover:scale-105" id="fabAdd" title="Tambah cepat">+</button>
+  </div>
+
+  <!-- FILTER PILLS -->
+  <div class="flex items-center gap-2 flex-wrap mb-4">
+    <span class="text-xs font-semibold text-ink">Filter :</span>
+    <button class="pill border-[1.5px] text-xs font-semibold px-3.5 py-[7px] rounded-full cursor-pointer border-orange text-orange bg-orange-soft" data-range="month">Bulan Ini</button>
+    <button class="pill border-[1.5px] text-xs font-semibold px-3.5 py-[7px] rounded-full cursor-pointer border-line text-muted bg-white" data-range="lastmonth">Bulan Lalu</button>
+    <button class="pill border-[1.5px] text-xs font-semibold px-3.5 py-[7px] rounded-full cursor-pointer border-line text-muted bg-white" data-range="all">Semua</button>
+  </div>
+
+  <!-- ENTRY CARD -->
+  <div class="bg-card rounded-[20px] border border-line p-4 mb-[18px]" id="entryCard">
+    <div class="flex gap-1.5 mb-3.5">
+      <button class="tab active flex-1 border-0 text-[12.5px] font-semibold py-[9px] px-1.5 rounded-[10px] cursor-pointer inline-flex items-center justify-center gap-1.5 bg-blue text-white" data-tab="scan">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        Pindai Struk
+      </button>
+      <button class="tab flex-1 border-0 text-[12.5px] font-semibold py-[9px] px-1.5 rounded-[10px] cursor-pointer inline-flex items-center justify-center gap-1.5 bg-gray-soft text-muted" data-tab="manual">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+        Isi Manual
+      </button>
+    </div>
+
+    <!-- Tab: Scan -->
+    <div class="tab-panel" id="panel-scan">
+      <label class="drop block border-[1.5px] border-dashed border-line rounded-[14px] p-[22px] text-center cursor-pointer hover:border-blue transition-colors" id="dropZone">
+        <input type="file" id="fileInput" accept="image/*" capture="environment" class="hidden">
+        <div class="mb-1.5 flex items-center justify-center text-muted">
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </div>
+        <div class="font-bold text-[13px]">Ambil foto / unggah struk</div>
+        <div class="text-[11.5px] text-muted mt-1">Cocok untuk struk Indomaret &amp; minimarket sejenis</div>
+      </label>
+      <div class="preview-wrap relative mt-3.5 rounded-[10px] overflow-hidden border border-line" id="previewWrap" style="display:none">
+        <img id="previewImg" alt="preview struk" class="block w-full">
+        <div class="scanline absolute left-0 right-0 top-0 h-[3px] bg-gradient-to-r from-transparent via-orange to-transparent shadow-[0_0_12px_2px_rgba(245,154,60,.8)] animate-sweep" id="scanline" style="display:none"></div>
+      </div>
+      <p class="text-xs text-blue mt-2 min-h-[16px]" id="ocrStatus"></p>
+      <button class="speak-btn hidden w-full mt-1 flex items-center justify-center gap-1.5 font-sans font-bold text-[13px] border-0 py-[11px] px-4 rounded-[10px] cursor-pointer bg-gray-soft text-ink hover:opacity-90 transition-opacity" id="speakBtn">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+        Bacakan ulang hasil struk
+      </button>
+    </div>
+
+    <!-- Tab: Manual -->
+    <div class="tab-panel hidden" id="panel-manual">
+      <p class="text-xs text-muted mb-2.5">Isi satu per satu, tekan <b>Tambah</b> untuk memasukkan ke daftar di bawah.</p>
+      <div class="manual-form">
+        <input type="text" id="manName" placeholder="Nama barang" class="m-name min-w-0 w-full border border-line rounded-[10px] px-2.5 py-[9px] text-[13px] font-sans text-ink">
+        <input type="number" id="manQty" placeholder="Qty" value="1" min="1" class="m-qty min-w-0 w-full border border-line rounded-[10px] px-2.5 py-[9px] text-[13px] font-sans text-ink">
+        <input type="text" inputmode="numeric" id="manPrice" placeholder="Harga (Rp)" class="m-price min-w-0 w-full border border-line rounded-[10px] px-2.5 py-[9px] text-[13px] font-sans text-ink">
+        <button class="font-sans font-bold text-[13px] border-0 py-[11px] px-4 rounded-[10px] cursor-pointer bg-blue text-white hover:opacity-90 transition-opacity" id="manAddBtn">Tambah</button>
+      </div>
+    </div>
+
+    <div class="border-t-[1.5px] border-dashed border-line my-4"></div>
+
+    <div class="flex items-center gap-2.5 mb-3">
+      <label for="txDate" class="text-xs text-muted font-semibold">Tanggal belanja</label>
+      <input type="date" id="txDate" class="border border-line rounded-[10px] px-2.5 py-1.5 font-mono text-[12.5px]">
+    </div>
+
+    <div class="w-full overflow-x-auto">
+      <table class="w-full border-collapse font-mono text-[12.5px]">
+        <thead>
+          <tr>
+            <th class="text-left text-[10px] tracking-wider uppercase text-muted border-b border-ink pb-1.5 px-1">Nama Barang</th>
+            <th class="text-right text-[10px] tracking-wider uppercase text-muted border-b border-ink pb-1.5 px-1">Qty</th>
+            <th class="text-right text-[10px] tracking-wider uppercase text-muted border-b border-ink pb-1.5 px-1">Harga</th>
+            <th class="border-b border-ink pb-1.5 px-1"></th>
+          </tr>
+        </thead>
+        <tbody id="itemsBody">
+          <tr><td colspan="4" class="text-center text-muted text-xs py-4">Belum ada item. Pindai struk atau isi manual di atas.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <button class="mt-2.5 font-mono text-[11.5px] bg-transparent text-blue border border-dashed border-blue px-2.5 py-1.5 rounded-[10px] cursor-pointer" id="addItemBtn">+ tambah baris kosong</button>
+
+    <div class="flex justify-between items-center font-mono pt-3 mt-1.5 border-t-2 border-ink">
+      <span>Total belanja</span>
+      <b id="txTotal" class="text-base text-coral">Rp 0</b>
+    </div>
+
+    <div class="flex gap-2 mt-4 flex-wrap">
+      <button class="font-sans font-bold text-[13px] border-0 py-[11px] px-4 rounded-[10px] cursor-pointer bg-blue text-white hover:opacity-90 transition-opacity" id="saveTxBtn">Simpan struk ini</button>
+      <button class="font-sans font-bold text-[13px] border-0 py-[11px] px-4 rounded-[10px] cursor-pointer bg-gray-soft text-ink hover:opacity-90 transition-opacity" id="clearTxBtn">Bersihkan</button>
+    </div>
+  </div>
+
+  <!-- LEDGER -->
+  <div class="font-pixel text-[11px] inline-flex items-center gap-2 bg-white border border-line px-3.5 py-2.5 rounded-full mb-3">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    RIWAYAT BELANJA
+  </div>
+
+  <div class="bg-orange-soft border border-[#F3DCB8] rounded-[14px] px-4 py-3.5 flex justify-between items-baseline mb-3.5">
+    <span class="text-[11.5px] font-bold text-orange uppercase tracking-wide" id="summaryLabel">Total bulan ini</span>
+    <span class="font-mono font-bold text-xl text-ink" id="rangeTotal">Rp 0</span>
+  </div>
+
+  <!-- MONTHLY CHART -->
+  <div class="font-pixel text-[11px] inline-flex items-center gap-2 bg-white border border-line px-3.5 py-2.5 rounded-full mb-3">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+    GRAFIK PER BULAN
+  </div>
+  <div class="bg-card rounded-[20px] border border-line p-[18px] pb-3 mb-3.5" id="chartCard">
+    <div class="text-center text-muted text-[13px] py-6 px-2.5" id="chartEmpty">Belum ada data untuk ditampilkan di grafik.</div>
+    <div class="chart-bars hidden flex items-end gap-2 h-[170px] px-0.5" id="chartBars"></div>
+  </div>
+
+  <div id="ledgerList"><div class="text-center text-muted text-[13px] py-6 px-2.5 bg-card border border-line rounded-[14px]">Belum ada struk tersimpan.</div></div>
+
+  <div class="flex gap-2 mt-1.5 flex-wrap">
+    <button class="flex-1 basis-[140px] inline-flex items-center justify-center gap-1.5 font-sans font-bold text-xs py-[9px] px-3 rounded-[10px] cursor-pointer bg-gray-soft text-ink hover:opacity-90 transition-opacity" id="exportBtn">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Ekspor data (.json)
+    </button>
+    <button class="flex-1 basis-[140px] inline-flex items-center justify-center gap-1.5 font-sans font-bold text-xs py-[9px] px-3 rounded-[10px] cursor-pointer bg-blue text-white hover:opacity-90 transition-opacity" id="exportPdfBtn">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      Ekspor ke PDF
+    </button>
+    <button class="flex-1 basis-[140px] inline-flex items-center justify-center gap-1.5 font-sans font-bold text-xs py-[9px] px-3 rounded-[10px] cursor-pointer bg-gray-soft text-ink hover:opacity-90 transition-opacity" id="importBtn">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Impor data
+    </button>
+    <input type="file" id="importFile" accept="application/json" class="hidden">
+  </div>
+
+  <footer class="text-center py-6 text-gray-400 text-sm">
+      <p>by andiana.aji
+          <span class="inline-flex gap-1 ml-1">
+              <span class="w-2 h-2 rounded-full bg-brand-red"></span>
+              <span class="w-2 h-2 rounded-full bg-brand-blue"></span>
+              <span class="w-2 h-2 rounded-full bg-brand-green"></span>
+              <span class="w-2 h-2 rounded-full bg-brand-orange"></span>
+          </span>
+      </p>
+  </footer>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
